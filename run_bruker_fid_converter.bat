@@ -1,0 +1,1 @@
+start pythonw.exe %~dp0bruker_fid_converter.py
