@@ -12,6 +12,8 @@ import os
 import io
 import subprocess
 import ConfigParser
+import datetime
+import logging
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -27,6 +29,15 @@ try:
 except AttributeError:
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig)
+
+
+# Get date and time for loggin timestamp.
+def get_timestamp():
+    timestamp = str(datetime.datetime.now())
+    timestamp = timestamp.replace(' ', '_')
+    timestamp = timestamp.replace(':', '-')
+    timestamp = timestamp.replace('.', '-')
+    return timestamp
 
 
 class Ui_MainWindow(object):
@@ -100,6 +111,7 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def get_file(self):
+        logging.info(get_timestamp() + ':' + 'Setting msconvert.exe path...')
         exe = QtGui.QFileDialog.getOpenFileName(None, 'Select Directory', 'C:\\')
         exe = str(exe).replace('/', '\\')
         config = ConfigParser.RawConfigParser()
@@ -109,16 +121,19 @@ class Ui_MainWindow(object):
             config.write(config_file)
 
     def get_input_path(self):
+        logging.info(get_timestamp() + ':' + 'Getting input data path...')
         sample_directory = QtGui.QFileDialog.getExistingDirectory(None, 'Select File/Directory', 'C:\\')
         sample_directory = str(sample_directory).replace('/', '\\')
         self.lineEdit.setText(sample_directory)
 
     def get_output_path(self):
+        logging.info(get_timestamp() + ':' + 'Setting output data path...')
         sample_directory = QtGui.QFileDialog.getExistingDirectory(None, 'Select Directory', 'C:\\')
         sample_directory = str(sample_directory).replace('/', '\\')
         self.lineEdit_2.setText(sample_directory)
 
     def get_msconvert_path(self):
+        logging.info(get_timestamp() + ':' + 'Getting msconvert.exe path...')
         with open(os.path.dirname(__file__) + '/config.ini', 'r') as config_file:
             config = config_file.read()
         config_parser = ConfigParser.RawConfigParser(allow_no_value=True)
@@ -135,27 +150,31 @@ class Ui_MainWindow(object):
                             error_box.exec_()
 
     def get_args(self):
+        logging.info(get_timestamp() + ':' + 'Getting arguments...')
         self.args['input'] = str(self.lineEdit.text())
         self.args['o'] = str(self.lineEdit_2.text())
 
     def raw_data_detection(self):
+        logging.info(get_timestamp() + ':' + 'Searching for FID files...')
         self.raw_data = [os.path.join(dirpath, filename)
                          for dirpath, dirnames, filenames, in os.walk(self.args['input'])
                          for filename in filenames
                          if os.path.split(filename)[1].lower() in ['fid']]
 
     def convert(self):
+        logging.info(get_timestamp() + ':' + 'Converting FID files...')
         self.get_args()
         self.get_msconvert_path()
         self.raw_data_detection()
         if os.path.isfile(self.path):
             for filename in self.raw_data:
-                if filename.split('\\')[-5].lower() != 'PSI' and filename.split('\\')[-5].lower() != 'PS1':
-                    outfile = '_'.join([filename.split('\\')[-5], filename.split('\\')[-3], filename.split('\\')[-4]])
-                    msconvertcmd = [self.path, filename, '-o', self.args['o'], '--outfile', outfile, '--mzXML', '--32',
-                                    '--mz32', '--inten32', '--filter',
-                                    '"titleMaker <RunId>.<ScanNumber>.<ScanNumber>.<ChargeState>"']
-                    subprocess.call(msconvertcmd)
+                logging.info(get_timestamp() + ':' + 'Converting ' + filename + '...')
+                outfile = '_'.join([filename.split('\\')[-5], filename.split('\\')[-3], filename.split('\\')[-4]])
+                msconvertcmd = [self.path, filename, '-o', self.args['o'], '--outfile', outfile, '--mzXML', '--32',
+                                '--mz32', '--inten32', '--filter',
+                                '"titleMaker <RunId>.<ScanNumber>.<ScanNumber>.<ChargeState>"']
+                logging.info(get_timestamp() + ':' + ' '.join(msconvertcmd))
+                subprocess.call(msconvertcmd)
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(_translate("MainWindow", "Bruker FID to mzXML Converter", None))
@@ -170,6 +189,15 @@ class Ui_MainWindow(object):
 
 
 def main():
+    logname = 'log_' + get_timestamp() + '.log'
+    logfile = os.path.join('logs', logname)
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    logging.basicConfig(filename=logfile, level=logging.INFO)
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    logger = logging.getLogger(__name__)
+
+    logging.info(get_timestamp() + ':' + 'Starting application...')
     app = QtGui.QApplication(sys.argv)
     MainWindow = QtGui.QMainWindow()
     ui = Ui_MainWindow()
